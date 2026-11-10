@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fast-api-jenkins
+spec:
+  rules:
+    - host: fast-api.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fast-api-jenkins
+                port:
+                  number: 80
