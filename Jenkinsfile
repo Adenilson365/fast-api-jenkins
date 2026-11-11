@@ -51,27 +51,28 @@ pipeline{
 
                 '''
             }
-        }
-    }
-    post {
-        always {
-            archiveArtifacts(
-                artifacts: 'reports/**/*',
-                allowEmptyArchive: true
-            )
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'reports/**/*',
+                        allowEmptyArchive: true
+                    )
 
-            script {
-                if (fileExists('reports/trivy-source.html')) {
-                    publishHTML(target: [
-                        reportDir: 'reports',
-                        reportFiles: 'trivy-source.html',
-                        reportName: 'Trivy - Source Scan',
-                        keepAll: true,
-                        alwaysLinkToLastBuild: true,
-                        allowMissing: false
-                    ])
+                    script {
+                        if (fileExists('reports/trivy-source.html')) {
+                            publishHTML(target: [
+                                reportDir: 'reports',
+                                reportFiles: 'trivy-source.html',
+                                reportName: 'Trivy - Source Scan',
+                                keepAll: true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing: false
+                            ])
+                        }
+                    }
                 }
             }
         }
     }
+
 }
