@@ -155,40 +155,76 @@ pipeline{
                 }
             }
         }
-        stage('Build'){
-            agent{label 'buildkit'}
-            environment{
-                DOCKER_HUB_USER = credentials('DOCKER_HUB_USER')
-                DOCKER_HUB_PASS = credentials('DOCKER_HUB_PASS')
+        
+        stage('Build') {
+            agent {
+                label 'buildkit'
             }
-            steps{
+
+            environment {
+                IMAGE_REPO = 'adenilsonkon/jenkins-fastapi'
+            }
+
+            steps {
+                checkout scm
+
+                script {
+                    def safeBranch = env.BRANCH_NAME
+                        .replaceAll(/[^a-zA-Z0-9_.-]/, '-')
+                        .toLowerCase()
+
+                    env.IMAGE_TAG = "${safeBranch}-${env.BUILD_NUMBER}"
+                    env.IMAGE_REF = "${env.IMAGE_REPO}:${env.IMAGE_TAG}"
+
+                    echo "Imagem: ${env.IMAGE_REF}"
+                }
+
+                // BuildKit
                 sh '''
-                docker buildx build \
-                --platform linux/amd64 \
-                --progress=plain \
-                -t adenilsonkon/jenkins-fastapi-${BRANCH_NAME}:${BUILD_NUMBER} \
-                --load \
-                .
-                '''
-                sh '''
-                    docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASS
-                '''
-                sh '''
+                    set -eu
+
                     docker buildx build \
-                    --platform linux/amd64 \
-                    --progress=plain \
-                    -t adenilsonkon/jenkins-fastapi-${BRANCH_NAME}:${BUILD_NUMBER} \
-                    --push \
-                    .
-            
+                        --platform linux/amd64 \
+                        --progress=plain \
+                        --load \
+                        -t "$IMAGE_REF" \
+                        .
+
+                    docker image inspect "$IMAGE_REF"
                 '''
+
+                // Autenticação e push
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -eu
+
+                        export DOCKER_CONFIG="$(mktemp -d)"
+                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+
+                        printf '%s' "$DOCKER_TOKEN" |
+                            docker login \
+                                --username "$DOCKER_USER" \
+                                --password-stdin
+
+                        docker push "$IMAGE_REF"
+                    '''
+                }
             }
+
             post {
-                always{
-                    echo "Image: adenilsonkon/jenkins-fastapi-${BRANCH_NAME}:${BUILD_NUMBER}"
+                always {
+                    echo "Build finalizado."
                 }
             }
         }
+
     }
 
 }
