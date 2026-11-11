@@ -2,6 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: fast-api-jenkins
+  namespace: fast-api-prd
 spec:
   rules:
     - host: fast-api.local
