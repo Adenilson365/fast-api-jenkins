@@ -131,8 +131,6 @@ pipeline{
                       )
                     ' reports/trivy-source.json |
                       tee reports/misconfig.tsv
-
-
                 '''
             }
             post {
@@ -155,6 +153,31 @@ pipeline{
                         }
                     }
                 }
+            }
+        }
+        stage('Build'){
+            agent{label 'buildkit'}
+            steps{
+                sh '''
+                docker buildx build \
+                --platform linux/amd64 \
+                --progress=plain \
+                -t adenilsonkon/jenkins-fastapi-${BRANCH_NAME}:${BUILD_NUMBER} \
+                --load \
+                .
+                '''
+                sh '''
+                    docker login -u $USERNAME -p $PASSWORD
+                '''
+                sh '''
+                    docker buildx build \
+                    --platform linux/amd64 \
+                    --progress=plain \
+                    -t adenilsonkon/jenkins-fastapi-${BRANCH_NAME}:${BUILD_NUMBER} \
+                    --push \
+                    .
+            
+                '''
             }
         }
     }
