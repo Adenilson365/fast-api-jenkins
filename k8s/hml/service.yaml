@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fast-api-jenkins
+  namespace: fast-api-prd
+spec:
+  type: ClusterIP
+  selector:
+    app: fast-api-jenkins
+  ports:
+    - port: 80
+      targetPort: 8000
