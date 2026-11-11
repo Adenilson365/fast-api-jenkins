@@ -157,6 +157,10 @@ pipeline{
         }
         stage('Build'){
             agent{label 'buildkit'}
+            environment{
+                DOCKER_HUB_USER = credentials('DOCKER_HUB_USER')
+                DOCKER_HUB_PASS = credentials('DOCKER_HUB_PASS')
+            }
             steps{
                 sh '''
                 docker buildx build \
@@ -167,7 +171,7 @@ pipeline{
                 .
                 '''
                 sh '''
-                    docker login -u $USERNAME -p $PASSWORD
+                    docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASS
                 '''
                 sh '''
                     docker buildx build \
@@ -178,6 +182,11 @@ pipeline{
                     .
             
                 '''
+            }
+            post {
+                always{
+                    echo "Image: adenilsonkon/jenkins-fastapi-${BRANCH_NAME}:${BUILD_NUMBER}"
+                }
             }
         }
     }
