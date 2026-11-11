@@ -49,6 +49,90 @@ pipeline{
 
                     set -- reports/trivy-source.json
 
+                                        # ====================================
+                    # RESUMO COM JQ
+                    # ====================================
+
+                    echo "=== RESUMO DE SEGURANCA ==="
+
+                    jq -s -r '
+                      . as $reports |
+                      (["Tipo","Severidade","Qtd"] | @tsv),
+                      (
+                        ["Vulnerabilities","Misconfigurations"][]
+                        as $type |
+                        ["CRITICAL","HIGH","MEDIUM","LOW","UNKNOWN"][]
+                        as $severity |
+                        [
+                          $type,
+                          $severity,
+                          ([
+                            $reports[]
+                            | .Results[]?
+                            | .[$type][]?
+                            | select(.Severity == $severity)
+                          ] | length | tostring)
+                        ] | @tsv
+                      )
+                    ' "$@" | tee reports/resumo.tsv
+
+                    # ====================================
+                    # CVES HIGH E CRITICAL
+                    # ====================================
+
+                    echo "=== CVES HIGH E CRITICAL ==="
+
+                    jq -s -r '
+                      ([
+                        "Severidade", "CVE", "Pacote",
+                        "Instalada", "Corrigida", "Alvo"
+                      ] | @tsv),
+                      (
+                        .[] | .Results[]? as $r |
+                        $r.Vulnerabilities[]? |
+                        select(
+                          .Severity == "HIGH" or
+                          .Severity == "CRITICAL"
+                        ) |
+                        [
+                          .Severity,
+                          .VulnerabilityID,
+                          .PkgName,
+                          .InstalledVersion,
+                          (.FixedVersion // "N/A"),
+                          $r.Target
+                        ] | @tsv
+                      )
+                    ' "$@" | tee reports/cves.tsv
+
+                    # ====================================
+                    # MISCONFIGURATIONS
+                    # ====================================
+
+                    echo "=== CONFIGURACOES INSEGURAS ==="
+
+                    jq -r '
+                      ([
+                        "Severidade", "ID", "Regra", "Alvo"
+                      ] | @tsv),
+                      (
+                        .Results[]? as $r |
+                        $r.Misconfigurations[]? |
+                        select(
+                          .Severity == "HIGH" or
+                          .Severity == "CRITICAL"
+                        ) |
+                        [
+                          .Severity,
+                          .ID,
+                          (.Title // "N/A"),
+                          $r.Target
+                        ] | @tsv
+                      )
+                    ' reports/trivy-source.json |
+                      tee reports/misconfig.tsv
+
+
                 '''
             }
             post {
