@@ -206,7 +206,20 @@ pipeline{
             steps{
                 sh '''
                     set -eu
+                    mkdir -p reports
+
                     HTML_TEMPLATE="/opt/trivy/templates/html.tpl"
+
+                    echo "=== VERSOES ==="
+                    trivy --version
+                    jq --version
+
+                    if [ ! -s "$HTML_TEMPLATE" ]; then
+                        echo "ERRO: Template HTML nao encontrado:"
+                        echo "$HTML_TEMPLATE"
+                        exit 1
+                    fi
+                    
                     if [ -n "${IMAGE_REF:-}" ]; then
 
                             echo "=== SCAN DA IMAGEM ==="
