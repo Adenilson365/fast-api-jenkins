@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: fast-api-jenkins
+  namespace: fast-api-hml
 spec:
   replicas: 1
   selector:
@@ -17,3 +18,10 @@ spec:
           image: fast-api-jenkins:latest
           ports:
             - containerPort: 8000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
