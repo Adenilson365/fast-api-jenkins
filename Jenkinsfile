@@ -202,6 +202,7 @@ pipeline{
         }
 
         stage('Trivy Image'){
+            agent {label 'trivy'}
             steps{
                 sh '''
                     set -eu
@@ -236,6 +237,7 @@ pipeline{
         }
 
         stage('Docker Push'){
+            agent {label 'buildkit'}
             steps{
                 // Autenticação e push
                 withCredentials([
