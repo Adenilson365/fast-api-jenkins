@@ -156,7 +156,7 @@ pipeline{
             }
         }
         
-        stage('Build') {
+        stage('Docker Build') {
             agent {
                 label 'buildkit'
             }
@@ -192,6 +192,48 @@ pipeline{
 
                     docker image inspect "$IMAGE_REF"
                 '''
+            }
+
+            post {
+                always {
+                    echo "Build finalizado."
+                }
+            }
+        }
+
+        stage('Trivy Image'){
+            sh '''
+                    set -eu
+                    HTML_TEMPLATE="/opt/trivy/templates/html.tpl"
+                    if [ -n "${IMAGE_REF:-}" ]; then
+
+                            echo "=== SCAN DA IMAGEM ==="
+
+                            trivy image \
+                            --scanners vuln \
+                            --format json \
+                            --exit-code 0 \
+                            --output reports/trivy-image.json \
+                            "$IMAGE_REF"
+
+                            echo "=== GERANDO HTML DA IMAGEM ==="
+
+                            trivy convert \
+                            --format template \
+                            --template "@${HTML_TEMPLATE}" \
+                            --output reports/trivy-image.html \
+                            reports/trivy-image.json
+
+                            set -- "$@" reports/trivy-image.json
+
+                        else
+                            echo "IMAGE_REF vazio."
+                            echo "Scan de imagem ignorado."
+                        fi
+                        '''
+        }
+
+        stage('Docker Push'){
 
                 // Autenticação e push
                 withCredentials([
@@ -216,13 +258,6 @@ pipeline{
                         docker push "$IMAGE_REF"
                     '''
                 }
-            }
-
-            post {
-                always {
-                    echo "Build finalizado."
-                }
-            }
         }
 
     }
