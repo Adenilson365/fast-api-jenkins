@@ -202,8 +202,8 @@ pipeline{
         }
 
         stage('Trivy Image'){
-            steps(
-            sh '''
+            steps{
+                sh '''
                     set -eu
                     HTML_TEMPLATE="/opt/trivy/templates/html.tpl"
                     if [ -n "${IMAGE_REF:-}" ]; then
@@ -231,12 +231,12 @@ pipeline{
                             echo "IMAGE_REF vazio."
                             echo "Scan de imagem ignorado."
                         fi
-                        '''
-            )
+                '''
+            }
         }
 
         stage('Docker Push'){
-            steps(
+            steps{
                 // Autenticação e push
                 withCredentials([
                     usernamePassword(
@@ -260,7 +260,7 @@ pipeline{
                         docker push "$IMAGE_REF"
                     '''
                 }
-            )
+            }
         }
 
     }
