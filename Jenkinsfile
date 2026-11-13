@@ -131,8 +131,6 @@ pipeline{
                       )
                     ' reports/trivy-source.json |
                       tee reports/misconfig.tsv
-
-
                 '''
             }
             post {
@@ -157,6 +155,129 @@ pipeline{
                 }
             }
         }
+        
+        stage('Docker Build') {
+            agent {
+                label 'buildkit'
+            }
+
+            environment {
+                IMAGE_REPO = 'adenilsonkon/jenkins-fastapi'
+            }
+
+            steps {
+                checkout scm
+
+                script {
+                    def safeBranch = env.BRANCH_NAME
+                        .replaceAll(/[^a-zA-Z0-9_.-]/, '-')
+                        .toLowerCase()
+
+                    env.IMAGE_TAG = "${safeBranch}-${env.BUILD_NUMBER}"
+                    env.IMAGE_REF = "${env.IMAGE_REPO}:${env.IMAGE_TAG}"
+
+                    echo "Imagem: ${env.IMAGE_REF}"
+                }
+
+                // BuildKit
+                sh '''
+                    set -eu
+
+                    docker buildx build \
+                        --platform linux/amd64 \
+                        --progress=plain \
+                        --load \
+                        -t "$IMAGE_REF" \
+                        .
+
+                    docker image inspect "$IMAGE_REF"
+                '''
+            }
+
+            post {
+                always {
+                    echo "Build finalizado."
+                }
+            }
+        }
+
+        stage('Trivy Image'){
+            agent {label 'trivy'}
+            steps{
+                sh '''
+                    set -eu
+                    mkdir -p reports
+
+                    HTML_TEMPLATE="/opt/trivy/templates/html.tpl"
+
+                    echo "=== VERSOES ==="
+                    trivy --version
+                    jq --version
+
+                    if [ ! -s "$HTML_TEMPLATE" ]; then
+                        echo "ERRO: Template HTML nao encontrado:"
+                        echo "$HTML_TEMPLATE"
+                        exit 1
+                    fi
+                    
+                    if [ -n "${IMAGE_REF:-}" ]; then
+
+                            echo "=== SCAN DA IMAGEM ==="
+
+                            trivy image \
+                            --scanners vuln \
+                            --format json \
+                            --exit-code 0 \
+                            --output reports/trivy-image.json \
+                            "$IMAGE_REF"
+
+                            echo "=== GERANDO HTML DA IMAGEM ==="
+
+                            trivy convert \
+                            --format template \
+                            --template "@${HTML_TEMPLATE}" \
+                            --output reports/trivy-image.html \
+                            reports/trivy-image.json
+
+                            set -- "$@" reports/trivy-image.json
+
+                        else
+                            echo "IMAGE_REF vazio."
+                            echo "Scan de imagem ignorado."
+                        fi
+                '''
+            }
+        }
+
+        stage('Docker Push'){
+            agent {label 'buildkit'}
+            steps{
+                // Autenticação e push
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -eu
+
+                        export DOCKER_CONFIG="$(mktemp -d)"
+                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+
+                        printf '%s' "$DOCKER_TOKEN" |
+                            docker login \
+                                --username "$DOCKER_USER" \
+                                --password-stdin
+
+                        docker push "$IMAGE_REF"
+                    '''
+                }
+            }
+        }
+
     }
 
 }
